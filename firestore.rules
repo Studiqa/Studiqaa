@@ -82,7 +82,7 @@ service cloud.firestore {
       allow read: if true; // freeLimits/featureFlags must be readable client-side
       allow write: if isAdmin();
     }
-    match /adminMeta/moderationQueue/{itemId} {
+    match /adminMeta/moderationQueue/items/{itemId} {
       allow read, write: if isAdmin();
     }
 

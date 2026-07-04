@@ -20,7 +20,10 @@ pattern for Notes/Quizzes/Flashcards/Coding/Roadmaps.
 | `apps/web` | Next.js app — **24 routes, `next build` succeeds clean** (see list below) |
 | `functions/src/aiProxy/*` | 6 callable Cloud Functions (mind maps, notes, quizzes, flashcards, roadmaps, tutor chat) — **typechecks clean with `tsc --noEmit`** |
 | `functions/src/webhooks/*` | Razorpay + Stripe webhooks with signature verification, + order-creation callable |
-| `.github/workflows/ci.yml` | Typecheck + unit tests + web build on every PR |
+| `functions/src/scheduled/*` | Daily/monthly usage-counter resets + expired-subscription safety-net sweep — **typechecks clean** |
+| `functions/src/admin/*` | `setAdminRole`, `publishContent`, `moderationAction` — all re-verify the caller's role server-side |
+| `apps/admin` | Separate Next.js app (port 3001): login, user list + role management, coding-problem publishing, moderation queue — **`next build` succeeds clean, 4 routes** |
+| `.github/workflows/ci.yml` | Typecheck + unit tests + web build + admin build on every PR |
 
 ### Web app routes
 Marketing, signup, login (email + Google), **login-otp (phone/SMS)**, onboarding (goal/details),
@@ -76,7 +79,10 @@ domain to the reCAPTCHA allowlist there.
 - Coding practice judge/grading is a stub — it records attempts but doesn't execute code
   (real code execution needs a sandboxed judge API like Judge0/Piston, wired server-side only).
 - Google Play / Apple IAP webhooks — Razorpay + Stripe are done; those two remain.
-- Admin app, Mobile app — not started.
+- Mobile app — not started.
+- Admin app's first admin account must be granted manually once (see below) — `setAdminRole`
+  requires the caller to already be an admin, which is correct for ongoing security but means
+  someone has to bootstrap the very first admin directly in the Firebase Console.
 - The Firestore rules emulator tests are written but **not executed in this sandbox** — running them
   requires the Firebase Emulator Suite (Java + downloaded emulator binaries from Google's servers),
   which this environment can't reach. Run them yourself once you clone the repo:
@@ -84,6 +90,14 @@ domain to the reCAPTCHA allowlist there.
   npm install
   npm test --workspace=@studiqa/rules-tests
   ```
+
+### Bootstrapping your first admin
+`setAdminRole` deliberately refuses to let a non-admin grant admin (so a bug or leaked
+token can't self-escalate) — which means the very first admin has to be set by hand:
+1. Sign up normally in the web app.
+2. In the Firebase Console → Firestore → `users/{your-uid}`, manually edit the `role`
+   field to `"admin"`.
+3. From then on, use `/users` in the admin app (`setAdminRole`) to promote anyone else.
 
 ## Running it locally after cloning
 
