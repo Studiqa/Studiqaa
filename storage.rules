@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+    // Uploaded PDFs/images/PPTs used as mind-map/notes source material.
+    match /users/{userId}/uploads/{allPaths=**} {
+      allow read, write: if isOwner(userId) &&
+        request.resource.size < 25 * 1024 * 1024 &&
+        request.resource.contentType.matches('application/pdf|image/.*|application/vnd.openxmlformats-officedocument.*');
+    }
+    match /publicContent/{allPaths=**} {
+      allow read: if true;
+      allow write: if false; // uploaded only via Admin SDK from Cloud Functions
+    }
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

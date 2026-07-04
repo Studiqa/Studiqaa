@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck functions
+        run: npm run build --workspace=@studiqa/functions
+      - name: Unit tests (srs-engine, usage-limits)
+        run: npm test --workspace=@studiqa/srs-engine --workspace=@studiqa/usage-limits
+      - name: Build web app
+        run: npm run build --workspace=@studiqa/web
+      # Firestore rules emulator tests require Java + firebase-tools' downloaded
+      # emulator binaries; run separately via `npm run test --workspace=@studiqa/rules-tests`
+      # in an environment with those available (not yet wired into this CI job).

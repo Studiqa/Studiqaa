@@ -1,0 +1,9 @@
+{
+  "name": "@studiqa/srs-engine",
+  "version": "0.1.0",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": { "test": "vitest run" },
+  "devDependencies": { "vitest": "^2.0.0" },
+  "dependencies": { "@studiqa/types": "0.1.0" }
+}
