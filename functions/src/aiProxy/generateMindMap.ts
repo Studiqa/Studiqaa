@@ -89,6 +89,13 @@ export const generateMindMap = onCall(
       await userRef.update({ "usageCounters.mindMapsThisMonth": FieldValue.increment(1) });
     }
 
+    await userRef.collection("activityHistory").add({
+      type: "mindmap",
+      title: aiOutput.title,
+      refId: mapRef.id,
+      createdAt: Date.now(),
+    });
+
     return { mapId: mapRef.id };
   }
 );

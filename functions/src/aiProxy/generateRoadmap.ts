@@ -1,17 +1,19 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
-import { initSRSState } from "@studiqa/srs-engine";
-import { flashcardDeckAISchema, type FlashcardDeckAIOutput } from "./flashcardSchema";
+import { randomUUID } from "crypto";
+import { roadmapAISchema, type RoadmapAIOutput } from "./roadmapSchema";
+import type { Goal } from "@studiqa/types";
 
 if (!getApps().length) initializeApp();
 
-async function callFlashcardModel(topic: string): Promise<FlashcardDeckAIOutput> {
+async function callRoadmapModel(subject: string, goal: Goal): Promise<RoadmapAIOutput> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new HttpsError("internal", "AI provider not configured");
 
-  const prompt = `Generate a flashcard deck (JSON only, no prose) for "${topic}". ` +
-    `Return {"title","cards":[{"front","back"}...]}. 12-20 cards, front is a question/term, back is the answer/definition.`;
+  const prompt = `Generate a step-by-step learning roadmap (JSON only, no prose) for "${subject}", ` +
+    `for a student whose goal is "${goal}". Return {"title","milestones":[{"title","description","resourceType"}...]}. ` +
+    `8-15 ordered milestones, resourceType one of mindmap/notes/quiz/flashcards/external.`;
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -28,43 +30,38 @@ async function callFlashcardModel(topic: string): Promise<FlashcardDeckAIOutput>
   } catch {
     throw new HttpsError("internal", "AI returned malformed JSON");
   }
-  const parsed = flashcardDeckAISchema.safeParse(parsedJson);
+  const parsed = roadmapAISchema.safeParse(parsedJson);
   if (!parsed.success) throw new HttpsError("internal", "AI output failed schema validation");
   return parsed.data;
 }
 
-export const generateFlashcards = onCall({ enforceAppCheck: true, cors: true }, async (request) => {
+export const generateRoadmap = onCall({ enforceAppCheck: true, cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in.");
-  const topic = String((request.data as { topic?: string })?.topic ?? "").trim();
-  if (!topic || topic.length > 200) throw new HttpsError("invalid-argument", "topic must be 1-200 characters.");
+  const { subject, goal } = (request.data as { subject?: string; goal?: Goal }) ?? {};
+  const cleanSubject = String(subject ?? "").trim();
+  if (!cleanSubject || cleanSubject.length > 200) throw new HttpsError("invalid-argument", "subject must be 1-200 characters.");
+  const cleanGoal: Goal = (["exam_prep", "placement", "upskilling"] as Goal[]).includes(goal as Goal)
+    ? (goal as Goal)
+    : "upskilling";
 
   const db = getFirestore();
   const userRef = db.doc(`users/${request.auth.uid}`);
-  const aiOutput = await callFlashcardModel(topic);
-  const today = new Date().toISOString().slice(0, 10);
+  const aiOutput = await callRoadmapModel(cleanSubject, cleanGoal);
 
-  const deckRef = userRef.collection("flashcardDecks").doc();
-  await deckRef.set({
+  const roadmapRef = userRef.collection("roadmaps").doc();
+  await roadmapRef.set({
     title: aiOutput.title,
-    subject: topic,
-    isPublic: false,
-    cardCount: aiOutput.cards.length,
+    goal: cleanGoal,
+    milestones: aiOutput.milestones.map((m) => ({ id: randomUUID(), ...m, completed: false })),
     createdAt: Date.now(),
   });
-
-  const batch = db.batch();
-  for (const card of aiOutput.cards) {
-    const cardRef = deckRef.collection("cards").doc();
-    batch.set(cardRef, { front: card.front, back: card.back, srs: initSRSState(today) });
-  }
-  await batch.commit();
 
   await userRef.collection("activityHistory").add({
-    type: "flashcards",
+    type: "roadmap",
     title: aiOutput.title,
-    refId: deckRef.id,
+    refId: roadmapRef.id,
     createdAt: Date.now(),
   });
 
-  return { deckId: deckRef.id };
+  return { roadmapId: roadmapRef.id };
 });

@@ -60,6 +60,16 @@ service cloud.firestore {
       match /roadmaps/{roadmapId} {
         allow read, write: if isOwner(userId);
       }
+      match /activityHistory/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /tutorSessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
     }
 
     // Curated, admin-managed content — world-readable, admin/moderator-writable only.
@@ -79,6 +89,13 @@ service cloud.firestore {
     match /analyticsAggregates/{date} {
       allow read: if isAdmin();
       allow write: if false; // written only by scheduled Cloud Function via Admin SDK
+    }
+
+    // Payment audit trail — written only by webhook Cloud Functions (Admin SDK bypasses
+    // these rules entirely), readable by the owning user and admins for transparency/support.
+    match /users/{userId}/subscriptionEvents/{eventId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
     }
 
     // Deny-all default for anything not explicitly matched above.

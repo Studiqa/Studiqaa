@@ -66,5 +66,12 @@ export const generateQuiz = onCall({ enforceAppCheck: true, cors: true }, async 
     await userRef.update({ "usageCounters.quizzesThisMonth": FieldValue.increment(1) });
   }
 
+  await userRef.collection("activityHistory").add({
+    type: "quiz",
+    title: aiOutput.title,
+    refId: quizRef.id,
+    createdAt: Date.now(),
+  });
+
   return { quizId: quizRef.id };
 });

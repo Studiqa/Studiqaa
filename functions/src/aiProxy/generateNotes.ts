@@ -58,5 +58,12 @@ export const generateNotes = onCall({ enforceAppCheck: true, cors: true }, async
     updatedAt: Date.now(),
   });
 
+  await userRef.collection("activityHistory").add({
+    type: "notes",
+    title: aiOutput.title,
+    refId: noteRef.id,
+    createdAt: Date.now(),
+  });
+
   return { noteId: noteRef.id };
 });
