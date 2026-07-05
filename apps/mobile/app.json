@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "Studiqa",
+    "slug": "studiqa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "bundleIdentifier": "com.studiqa.app", "supportsTablet": false },
+    "android": { "package": "com.studiqa.app" }
+  }
+}
