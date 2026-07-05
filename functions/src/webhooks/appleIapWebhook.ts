@@ -2,6 +2,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { SignedDataVerifier, Environment } from "@apple/app-store-server-library";
+import { getAppleRootCerts } from "./appleRootCerts";
 
 if (!getApps().length) initializeApp();
 
@@ -26,9 +27,10 @@ export const appleIapWebhook = onRequest(async (req, res) => {
       return;
     }
 
-    // In production, load Apple's root CA certs (fetched once at deploy time / cached)
-    // rather than an empty array — required for constructor to actually validate the chain.
-    const rootCerts: Buffer[] = []; // TODO: load Apple's G3 root CA certs before going live
+    // Apple's actual root CA certs, fetched once and cached — see appleRootCerts.ts
+    // for why these are fetched rather than hardcoded (public certs, not secrets;
+    // fetching allows Apple-side rotation without a redeploy).
+    const rootCerts = await getAppleRootCerts();
     const verifier = new SignedDataVerifier(
       rootCerts,
       true, // enableOnlineChecks

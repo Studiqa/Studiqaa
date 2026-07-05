@@ -77,16 +77,15 @@ domain to the reCAPTCHA allowlist there.
 
 ## What's intentionally stubbed / not yet built
 
+- **Google Play webhook**: now fully verifies Pub/Sub push authenticity via a real
+  Google-signed OIDC token check (`verifyGooglePushAuth.ts`) — you just need to set
+  `PUBSUB_PUSH_AUDIENCE` and `PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL` to match how you
+  configure the Pub/Sub push subscription in Google Cloud Console.
+- **Apple IAP webhook**: now fully verifies JWS signatures against Apple's real root CA
+  certs, fetched from Apple's official URL and cached in memory (`appleRootCerts.ts`) —
+  no further code changes needed here.
 - Coding practice judge/grading is a stub — it records attempts but doesn't execute code
   (real code execution needs a sandboxed judge API like Judge0/Piston, wired server-side only).
-- **Google Play webhook**: signature verification via Pub/Sub push authentication (OIDC
-  token check) is noted but not implemented — required before production, see the
-  `TODO` comment in `googlePlayWebhook.ts`. Purchase re-verification via the Play
-  Developer API IS implemented.
-- **Apple IAP webhook**: JWS signature verification against Apple's actual root CA certs
-  needs those certs loaded (currently an empty array — see the `TODO` in
-  `appleIapWebhook.ts`); the verification *mechanism* (Apple's own `SignedDataVerifier`)
-  is wired in correctly, it just needs the real cert bundle before production.
 - Mobile app has no App Check provider wired yet (Play Integrity / App Attest) — the
   callables will work in Firebase's test mode but should get App Check before shipping,
   same as the web app's reCAPTCHA Enterprise.

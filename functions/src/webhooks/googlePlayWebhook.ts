@@ -2,6 +2,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { google } from "googleapis";
+import { verifyGooglePushAuth } from "./verifyGooglePushAuth";
 
 if (!getApps().length) initializeApp();
 
@@ -22,21 +23,25 @@ const RENEWED_OR_ACTIVE = new Set([1, 2, 4, 7]); // RECOVERED, RENEWED, PURCHASE
 const DOWNGRADE_TYPES = new Set([3, 12, 13]); // CANCELED, REVOKED, EXPIRED
 
 /**
- * Google Play sends subscription events via Pub/Sub push, not a directly-signed webhook
- * like Razorpay/Stripe. Trust here comes from TWO layers instead of an HMAC signature:
- *   1. This endpoint's URL is configured as a Pub/Sub push subscription — Google Cloud
- *      itself only invokes it with a valid OIDC token if you configure the push
- *      subscription with authentication (recommended: verify the `Authorization: Bearer`
- *      header against Google's public certs, exactly as you'd verify any Google-signed
- *      OIDC token — omitted here for brevity, but REQUIRED before going to production).
- *   2. Independently, we NEVER trust the notification body's claims about entitlement —
- *      we take only the purchaseToken from it and re-fetch the actual subscription state
- *      from Google's Play Developer API using a service-account credential that lives
- *      only on this server (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), never in any client bundle.
+ * Google Play sends subscription events via Pub/Sub push. Trust here comes from
+ * TWO independent layers:
+ *   1. verifyGooglePushAuth() below — confirms this request really came from your
+ *      configured Pub/Sub push subscription (Google-signed OIDC token), not from
+ *      someone who just knows/guesses this URL.
+ *   2. We NEVER trust the notification body's claims about entitlement — we take
+ *      only the purchaseToken from it and re-fetch the actual subscription state
+ *      from Google's Play Developer API using a service-account credential that
+ *      lives only on this server (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), never in any
+ *      client bundle.
  */
 export const googlePlayWebhook = onRequest(async (req, res) => {
-  // TODO before production: verify req.headers.authorization is a valid Google-issued
-  // OIDC token for your configured Pub/Sub push service account.
+  try {
+    await verifyGooglePushAuth(req);
+  } catch (err: any) {
+    res.status(err.code === "unauthenticated" ? 401 : 403).send(err.message ?? "Unauthorized");
+    return;
+  }
+
   try {
     const body = req.body as RTDNMessage;
     const decoded = Buffer.from(body.message.data, "base64").toString("utf8");
